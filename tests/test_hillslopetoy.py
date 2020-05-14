@@ -35,3 +35,18 @@ def test_command_line_interface():
     help_result = runner.invoke(cli.main, ['--help'])
     assert help_result.exit_code == 0
     assert '--help  Show this message and exit.' in help_result.output
+
+@pytest.fixture
+def test_analytical():
+    """
+    This tests the anayltical solutions
+    """
+    
+    x_half = hillslopetoy.set_profile_locations_half_length()
+    x_full = hillslopetoy.set_profile_locations_constant()
+    x_displace = hillslopetoy.displace_profile_locations_constant(x_half)
+    
+    z_half = hillslopetoy.ss_nonlinear_elevation(x_half)
+    z_full = hillslopetoy.ss_nonlinear_elevation(x_full)
+    z_displace = hillslopetoy.ss_nonlinear_elevation(x_displace)
+    

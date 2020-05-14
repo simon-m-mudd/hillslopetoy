@@ -28,6 +28,7 @@ def ss_nonlinear_elevation(x,S_c = 1.0,C_0 = 0.001 ,D = 0.01 ,rho_ratio =2 ,c =2
         14/05/2020  
     """    
 
+    # This comes from the Roering et al. 2007 solution
     beta = rho_ratio*C_0
     first_part = - S_c*S_c*0.5/beta
     second_part = np.sqrt( D*D + (2*beta*x/S_c)*(2*beta*x/S_c) )
@@ -54,10 +55,32 @@ def ss_nonlinear_hilltop_curvature(C_0 = 0.001, D = 0.01, rho_ratio =2):
         14/05/2020  
     """    
 
+    # This comes from the Roering et al. 2007 solution
     curv_analytical = -rho_ratio*C_0/D
     return curv_analytical      
     
 
+def set_profile_locations_half_length(half_length = 8,spacing = 1):
+    """This sets the profile for a distance either side of the hillcrest
+
+    Args:
+        half_length (float): The distance covered by the profile away rom the hillcrest
+        spacing (float): The spacing of x  in metres 
+
+    Returns:
+        A numpy array with the hillslope locations in metres
+
+    Author:
+        Simon M Mudd
+        
+    Date:
+        14/05/2020    
+    """
+    minimum_x = -half_length
+    maximum_x = half_length+0.01
+    x_locs = np.arange(minimum_x,maximum_x,spacing)
+    return x_locs   
+    
 
 def set_profile_locations_constant(minimum_x = -8, maximum_x = 8.01,spacing = 1):
     """This is the most basic function for setting up the profile locations
@@ -80,6 +103,26 @@ def set_profile_locations_constant(minimum_x = -8, maximum_x = 8.01,spacing = 1)
     return x_locs
     
 
+def displace_profile_locations_constant(x, displacement_distance = 0.1):
+    """This shifts the profile locations by a fixed amount
+
+    Args:
+        x (array): The array of x locations
+        displacement_distance (float): How far the profile locations will be displaced in metres. 
+        Simulates missing the hillcrest in the DEM
+
+    Returns:
+        A numpy array with the hillslope locations in metres
+
+    Author:
+        Simon M Mudd
+        
+    Date:
+        14/05/2020    
+    """
+    x_locs = np.add(x,displacement_distance)
+    return x_locs    
+    
 def fit_hilltop_curvature(x,z):
     """This takes the curvature from the profiles and fits a polynomial to minic
     what happens inside LSDTopoTools curvature algorithm
@@ -98,9 +141,51 @@ def fit_hilltop_curvature(x,z):
         14/05/2020    
     """    
     poly_degree = 2
-    p = np.polyfit(x_array, z_list, poly_degree)
+    p = np.polyfit(x, z, poly_degree)
     curv_meas = 2*p[0]
     return curv_meas
+
+def ratio_of_fit_to_analytical_hilltop_curvature(displacement_distances, half_length = 7, spacing = 1, S_c = 1.0, C_0 = 0.001 ,D=0.01, rho_ratio=2):
+    """This takes the curvature from the profiles and fits a polynomial to minic
+    what happens inside LSDTopoTools curvature algorithm
+
+    Args:
+        displacement_distance (float array or list): Displacement distances: how far away from the divide the gidded divide point is
+        half_length (float): The distance covered by the profile away rom the hillcrest
+        spacing (float): The spacing of x  in metres       
+        S_c (float): Critical slope (dimensionless)
+        C_0 (float): Steady uplift/erosion in m/yr
+        D (float): sediment transport coefficient in m^2/yr
+        rho_ratio (float): ratio between rock and soil density
+
+    Returns:
+        A list of the ratio of measured curvature to analytical curvature
+
+    Author:
+        Simon M Mudd
+        
+    Date:
+        14/05/2020    
+    """ 
+    
+    # first create the x data
+    x_loc_baseline = set_profile_locations_half_length(half_length = half_length,spacing = spacing)
+    analytical_curvature = ss_nonlinear_hilltop_curvature(C_0 = C_0, D = D, rho_ratio = rho_ratio)
+    
+    curv_ratios = []
+    
+    # now enter a loop where we do displacements
+    for displacement in displacement_distances:
+        displaced_x_loc = displace_profile_locations_constant(x_loc_baseline, displacement_distance = displacement)
+        z = ss_nonlinear_elevation(displaced_x_loc,S_c = S_c,C_0 = C_0 ,D = D ,rho_ratio =rho_ratio)
+        
+        # get the curvature fit
+        meas_curv = fit_hilltop_curvature(displaced_x_loc,z)
+        curv_ratios.append(meas_curv/analytical_curvature)
+        
+    return curv_ratios
+        
+    
     
 def plot_ss_hillslope(x,z,show_figure = False, print_to_file = True, filename = "hillslope_profile.png", ):
     """This prints a hillslope profile
