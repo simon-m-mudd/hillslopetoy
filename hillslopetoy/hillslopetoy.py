@@ -194,7 +194,7 @@ def calculate_apparent_D(meas_erosion,meas_curv,half_length = 7, spacing = 1, S_
         
     
     # Run the optimisation
-    root = optimize.newton(curvature_difference_function,D_apparent,args=(x_loc_baseline,S_c,meas_erosion,rho_ratio,meas_curv))
+    root_1 = optimize.newton(curvature_difference_function,D_apparent,args=(x_loc_baseline,S_c,meas_erosion,rho_ratio,meas_curv))
     #print("The D needed to get the measured curvature is: "+str(root))
     
     # now test
@@ -203,7 +203,15 @@ def calculate_apparent_D(meas_erosion,meas_curv,half_length = 7, spacing = 1, S_
     
     #print("Measured curvature is: "+str(meas_curv)+ " and the apparent curvature measured from a gridded sample is: "+str(app_curv))
     
-    return root
+    
+    # now to get a range, we want the minimum and maximum values
+    x_displace_max = displace_profile_locations_constant(x_loc_baseline,spacing/2)
+    x_displace_mean = displace_profile_locations_constant(x_loc_baseline,spacing/4)
+    
+    root_2 = optimize.newton(curvature_difference_function,D_apparent,args=(x_displace_max,S_c,meas_erosion,rho_ratio,meas_curv))
+    root_3 = optimize.newton(curvature_difference_function,D_apparent,args=(x_displace_mean,S_c,meas_erosion,rho_ratio,meas_curv))
+    
+    return [root_1,root_3,root_2]
     
     
 
