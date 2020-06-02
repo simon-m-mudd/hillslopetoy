@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from scipy import optimize
+import statistics as st
 
 def ss_nonlinear_elevation(x,S_c = 1.0,C_0 = 0.001 ,D = 0.01 ,rho_ratio =2 ,c =20):
     """This returns the elevations along a transect using the analytical solutions of the hillslope equations. 
@@ -265,7 +266,8 @@ def calculate_apparent_D_with_noise(meas_erosion,meas_curv,half_length = 7, spac
     # Run the optimisation
     root_1_list = []
     for i in range(0,n_iterations):
-        root_1 = optimize.newton(curvature_difference_function_with_noise,D_apparent,args=(x_loc_baseline,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+        #root_1 = optimize.newton(curvature_difference_function_with_noise,D_apparent,args=(x_loc_baseline,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+        root_1 = optimize.toms748(curvature_difference_function_with_noise,0.00000000001,1,args=(x_loc_baseline,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
         root_1_list.append(root_1)
     
     
@@ -278,17 +280,24 @@ def calculate_apparent_D_with_noise(meas_erosion,meas_curv,half_length = 7, spac
     
     # now to get a range, we want the minimum and maximum values
     x_displace_max = displace_profile_locations_constant(x_loc_baseline,spacing/2)
-    x_displace_mean = displace_profile_locations_constant(x_loc_baseline,spacing/4)
+    #x_displace_mean = displace_profile_locations_constant(x_loc_baseline,spacing/4)
     
     root_2_list = []
     root_3_list = []
     for i in range(0,n_iterations):
-        root_2 = optimize.newton(curvature_difference_function_with_noise,D_apparent,args=(x_displace_max,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
-        root_3 = optimize.newton(curvature_difference_function_with_noise,D_apparent,args=(x_displace_mean,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
-        root_2_list.append(root_2)
-        root_3_list.append(root_3)
+        root_2 = optimize.toms748(curvature_difference_function_with_noise,0.00000000001,1,args=(x_displace_max,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+        #root_3 = optimize.toms748(curvature_difference_function_with_noise,0.00000000001,1,args=(x_displace_mean,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+        root_1_list.append(root_2)
+        #root_1_list.append(root_3)
     
-    return [root_1,root_3,root_2]
+    max_D = max(root_1_list)
+    min_D = min(root_1_list)
+    med_D = st.median(root_1_list)
+    
+    print("Range of D:")
+    print([min_D,med_D,max_D])
+    
+    return [min_D,med_D,max_D]
     
     
     
@@ -348,24 +357,24 @@ def curvature_difference_function_with_noise(D, x, S_c, C_0, rho_ratio,meas_curv
     
     # first create the x data
     z = ss_nonlinear_elevation(x,S_c = S_c,C_0 = C_0 , D = D ,rho_ratio = rho_ratio)
-    print("The elevation vector is")
-    print(z)
-    print(len(z))
+    #print("The elevation vector is")
+    #print(z)
+    #print(len(z))
     
     n_nodes = len(z)
     noise_vec = np.random.rand(n_nodes)
     noise_vec = np.subtract(noise_vec,0.5)
     noise_vec = np.multiply(noise_vec,mean_uncert)
-    print("The noise vector is: ")
-    print(noise_vec)
+    #print("The noise vector is: ")
+    #print(noise_vec)
     noisy_z = np.add(z,noise_vec)
-    print("The noisy elevation is:")
-    print(noisy_z)
-    print(len(noisy_z))
+    #print("The noisy elevation is:")
+    #print(noisy_z)
+    #print(len(noisy_z))
     
     
     fit_curvature = fit_hilltop_curvature(x,noisy_z)
-    print("fit_curvature is: "+str(fit_curvature))
+    #print("fit_curvature is: "+str(fit_curvature))
     curvature_offset = meas_curvature-fit_curvature
     
     return curvature_offset
