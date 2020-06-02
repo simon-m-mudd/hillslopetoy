@@ -214,7 +214,83 @@ def calculate_apparent_D(meas_erosion,meas_curv,half_length = 7, spacing = 1, S_
     return [root_1,root_3,root_2]
     
     
+def calculate_apparent_D_with_noise(meas_erosion,meas_curv,half_length = 7, spacing = 1, S_c = 1.0, rho_ratio=2, topographic_uncert = 0.5, n_iterations = 5):
+    """This functions aim is to see whqat the actualk curvature would be if the profile were displaced
 
+    Args:
+        meas_erosion (float): the measured erosion rate (in m/yr)
+        meas_curv (float): the curvature measured from the DEM
+        half_length (float): The distance covered by the profile away rom the hillcrest
+        spacing (float): The spacing of x  in metres       
+        S_c (float): Critical slope (dimensionless)
+        rho_ratio (float): ratio between rock and soil density
+        topographic_uncert (float): the mean uncertainty in m of the topographic data
+        n_iterations (int): the number of iterations you use to do the random uncertainty. 
+
+    Returns:
+        The ridgetop curvature in 1/m
+
+    Author:
+        Simon M Mudd
+        
+    Date:
+        15/05/2020    
+    """  
+    
+    # first guess the diffusivity from the measured data
+    D_apparent = -rho_ratio*meas_erosion/meas_curv
+    print("The apparent D is:"+str(D_apparent)+" or "+str(D_apparent*1000)+" in m^2/kyr")
+    
+    # now we get the baseline sampling
+    x_loc_baseline = set_profile_locations_half_length(half_length = half_length,spacing = spacing)
+    
+    # now solve the D needed to get the apparent D
+    print("Right, going into the optimization loop")
+    #print("By the way, the starting C is")
+    #first_curv = curvature_difference_function(D_apparent, x_loc_baseline, S_c, meas_erosion, rho_ratio,meas_curv)
+    #print("meas: "+str(meas_curv)+" and difference from the test curvature: "+str(first_curv))
+    #big = curvature_difference_function(D_apparent*2, x_loc_baseline, S_c, meas_erosion, rho_ratio,meas_curv)
+    #small = curvature_difference_function(D_apparent*0.5, x_loc_baseline, S_c, meas_erosion, rho_ratio,meas_curv)
+    #print("big:" +str(big)+" and small: "+str(small))
+    
+    # plot the curvature function
+    #D_vals = [D_apparent*0.5,D_apparent,D_apparent*2]
+    #C_offset_vals = []
+    #for D in D_vals:
+    #    C_offset_vals.append( curvature_difference_function(D, x_loc_baseline, S_c, meas_erosion, rho_ratio,meas_curv) )
+    #print("C offsets are: ")
+    #print(C_offset_vals)
+        
+    
+    # Run the optimisation
+    root_1_list = []
+    for i in range(0,n_iterations):
+        root_1 = optimize.newton(curvature_difference_function_with_noise,D_apparent,args=(x_loc_baseline,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+        root_1_list.append(root_1)
+    
+    
+    # now test
+    #z = ss_nonlinear_elevation(x_loc_baseline,S_c = S_c,C_0 = meas_erosion , D=root ,rho_ratio = rho_ratio)
+    #app_curv = fit_hilltop_curvature(x_loc_baseline,z)
+    
+    #print("Measured curvature is: "+str(meas_curv)+ " and the apparent curvature measured from a gridded sample is: "+str(app_curv))
+    
+    
+    # now to get a range, we want the minimum and maximum values
+    x_displace_max = displace_profile_locations_constant(x_loc_baseline,spacing/2)
+    x_displace_mean = displace_profile_locations_constant(x_loc_baseline,spacing/4)
+    
+    root_2_list = []
+    root_3_list = []
+    for i in range(0,n_iterations):
+        root_2 = optimize.newton(curvature_difference_function_with_noise,D_apparent,args=(x_displace_max,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+        root_3 = optimize.newton(curvature_difference_function_with_noise,D_apparent,args=(x_displace_mean,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+        root_2_list.append(root_2)
+        root_3_list.append(root_3)
+    
+    return [root_1,root_3,root_2]
+    
+    
     
 def curvature_difference_function(D, x, S_c, C_0, rho_ratio,meas_curvature):
     """This gets the difference between the measured curvature and the curvature calculated for a given value of D.
@@ -247,6 +323,53 @@ def curvature_difference_function(D, x, S_c, C_0, rho_ratio,meas_curvature):
     return curvature_offset
     
 
+def curvature_difference_function_with_noise(D, x, S_c, C_0, rho_ratio,meas_curvature,mean_uncert):
+    """This gets the difference between the measured curvature and the curvature calculated for a given value of D.
+    Used with Newton-Raphson optimisation.
+
+    Args:
+        D (float): sediment transport coefficient in m^2/yr   
+        x (array): The array of x locations
+        S_c (float): Critical slope (dimensionless)
+        C_0 (float): Steady uplift/erosion in m/yr       
+        rho_ratio (float): ratio between rock and soil density
+        meas_curvature (float): the measured curvature. 
+        mean_uncert (float): the mean random noise added to the data
+
+    Returns:
+        The curvature as measured from the profile x 
+
+    Author:
+        Simon M Mudd
+        
+    Date:
+        15/05/2020    
+    """ 
+    
+    # first create the x data
+    z = ss_nonlinear_elevation(x,S_c = S_c,C_0 = C_0 , D = D ,rho_ratio = rho_ratio)
+    print("The elevation vector is")
+    print(z)
+    print(len(z))
+    
+    n_nodes = len(z)
+    noise_vec = np.random.rand(n_nodes)
+    noise_vec = np.subtract(noise_vec,0.5)
+    noise_vec = np.multiply(noise_vec,mean_uncert)
+    print("The noise vector is: ")
+    print(noise_vec)
+    noisy_z = np.add(z,noise_vec)
+    print("The noisy elevation is:")
+    print(noisy_z)
+    print(len(noisy_z))
+    
+    
+    fit_curvature = fit_hilltop_curvature(x,noisy_z)
+    print("fit_curvature is: "+str(fit_curvature))
+    curvature_offset = meas_curvature-fit_curvature
+    
+    return curvature_offset
+    
             
     
     
