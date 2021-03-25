@@ -8,6 +8,121 @@ import matplotlib.pyplot as plt
 from scipy import optimize
 import statistics as st
 
+
+
+def axis_styler(ax,axis_style="Normal"):
+    """This sets the line width and fonts on the axes.
+
+    Args:
+        ax_list (axes objects): the list of axis objects
+        axis_style (string): The syle of the axis. See options below.
+
+    Author: SMM
+    """
+
+    if axis_style == "Normal":
+        lw = 1              # line width
+        ftsz = 10           # Size of tick label font
+        tpd = 2             # Tick padding
+        label_ftsz = 12     # Fontsize of axis label
+    elif axis_style == "Thick":
+        lw = 2
+        ftsz = 10
+        tpd = 2
+        label_ftsz = 12
+    elif axis_style == "Thin":
+        lw = 0.5
+        ftsz = 8
+        tpd = 1
+        label_ftsz = 10
+    elif axis_style == "Ultra_Thin":
+        lw = 0.4
+        ftsz = 4
+        tpd = 0.3
+        label_ftsz = 6
+    elif axis_style == "Big":
+        lw = 2
+        ftsz = 12
+        tpd = 3
+        label_ftsz = 14
+    elif axis_style == "Madhouse":
+        # This is just a crazy style to test if the figure is actually recieving these instructions
+        lw = 4
+        ftsz = 20
+        tpd = 3
+        label_ftsz = 6
+    else:
+        print("Using the default axis styling")
+        lw = 1
+        ftsz = 10
+        tpd = 2
+        label_ftsz = 12
+
+
+    # Now to fix up the axes
+    ax.spines['top'].set_linewidth(lw)
+    ax.spines['left'].set_linewidth(lw)
+    ax.spines['right'].set_linewidth(lw)
+    ax.spines['bottom'].set_linewidth(lw)
+
+    ax.xaxis.label.set_size(label_ftsz)
+    ax.yaxis.label.set_size(label_ftsz)
+
+    # This gets all the ticks, and pads them away from the axis so that the corners don't overlap
+    ax.tick_params(axis='both', width=lw, pad = tpd, labelsize = ftsz )
+
+    return ax
+
+
+def set_channel_to_zero(z):
+	"""Assumes the channel elevation is in node 0 and adjusts the elevation to 
+	that elevation
+
+	Args:
+		z (float array): the elevations Channel assumed to be at z[0]
+
+	Returns:
+		an array with all elevations adjusted to the channel at node z[0]
+
+	Author: SMM
+	Date: 25/03/2021
+	"""
+
+	min_val = z[0]
+	new_z = z-min_val
+	return new_z
+
+
+
+def ss_linear_elevation(x,C_0 = 0.001 ,D = 0.01 ,rho_ratio =2 ,c =20):
+    """This returns the elevations along a transect for the linear transport model
+
+    Args:
+        x (float array): Location of the elevation nodes
+        S_c (float): Critical slope (dimensionless)
+        C_0 (float): Steady uplift/erosion in m/yr
+        D (float): sediment transport coefficient in m^2/yr
+        rho_ratio (float): ratio between rock and soil density
+        c (float): a scaling constant that sets the elevation of the divide in metres
+        
+    Returns:
+        the elevation along the profile as a numpy array
+
+    Author:
+        Simon M Mudd
+        
+    Date:
+        14/05/2020  
+    """    
+
+    # This comes from the Roering et al. 2007 solution
+    beta = rho_ratio*C_0
+    first_part = -beta/(2*D)
+    second_part = np.multiply(x,x)
+    full_z = first_part*second_part
+    return full_z    
+
+
 def ss_nonlinear_elevation(x,S_c = 1.0,C_0 = 0.001 ,D = 0.01 ,rho_ratio =2 ,c =20):
     """This returns the elevations along a transect using the analytical solutions of the hillslope equations. 
     From Roering et al 2007
@@ -62,11 +177,11 @@ def ss_nonlinear_hilltop_curvature(C_0 = 0.001, D = 0.01, rho_ratio =2):
     return curv_analytical      
     
 
-def set_profile_locations_half_length(half_length = 8,spacing = 1):
+def set_profile_locations_half_length(half_length = 6,spacing = 1):
     """This sets the profile for a distance either side of the hillcrest
 
     Args:
-        half_length (float): The distance covered by the profile away rom the hillcrest
+        half_length (float): The distance covered by the profile away from the hillcrest
         spacing (float): The spacing of x  in metres 
 
     Returns:
@@ -84,7 +199,7 @@ def set_profile_locations_half_length(half_length = 8,spacing = 1):
     return x_locs   
     
 
-def set_profile_locations_constant(minimum_x = -8, maximum_x = 8.01,spacing = 1):
+def set_profile_locations_constant(minimum_x = -8.01, maximum_x = 8.01,spacing = 1):
     """This is the most basic function for setting up the profile locations
 
     Args:
@@ -148,7 +263,7 @@ def fit_hilltop_curvature(x,z):
     return curv_meas
 
 
-def calculate_apparent_D(meas_erosion,meas_curv,half_length = 7, spacing = 1, S_c = 1.0, rho_ratio=2):
+def calculate_apparent_D(meas_erosion,meas_curv,half_length = 6, spacing = 1, S_c = 1.0, rho_ratio=2):
     """This functions aim is to see whqat the actualk curvature would be if the profile were displaced
 
     Args:
@@ -215,7 +330,7 @@ def calculate_apparent_D(meas_erosion,meas_curv,half_length = 7, spacing = 1, S_
     return [root_1,root_3,root_2]
     
     
-def calculate_apparent_D_with_noise(meas_erosion,meas_curv,half_length = 7, spacing = 1, S_c = 1.0, rho_ratio=2, topographic_uncert = 0.5, n_iterations = 5):
+def calculate_apparent_D_with_noise(meas_erosion,meas_curv,half_length = 6, spacing = 1, S_c = 1.0, rho_ratio=2, topographic_uncert = 0.5, n_iterations = 5):
     """This functions aim is to see whqat the actualk curvature would be if the profile were displaced
 
     Args:
@@ -267,7 +382,7 @@ def calculate_apparent_D_with_noise(meas_erosion,meas_curv,half_length = 7, spac
     root_1_list = []
     for i in range(0,n_iterations):
         #root_1 = optimize.newton(curvature_difference_function_with_noise,D_apparent,args=(x_loc_baseline,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
-        root_1 = optimize.toms748(curvature_difference_function_with_noise,0.00000000001,1,args=(x_loc_baseline,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+        root_1 = optimize.toms748(curvature_difference_function_with_noise,0.000000000001,10,args=(x_loc_baseline,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
         root_1_list.append(root_1)
     
     
@@ -285,7 +400,7 @@ def calculate_apparent_D_with_noise(meas_erosion,meas_curv,half_length = 7, spac
     root_2_list = []
     root_3_list = []
     for i in range(0,n_iterations):
-        root_2 = optimize.toms748(curvature_difference_function_with_noise,0.00000000001,1,args=(x_displace_max,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+        root_2 = optimize.toms748(curvature_difference_function_with_noise,0.000000000001,10,args=(x_displace_max,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
         #root_3 = optimize.toms748(curvature_difference_function_with_noise,0.00000000001,1,args=(x_displace_mean,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
         root_1_list.append(root_2)
         #root_1_list.append(root_3)
@@ -293,11 +408,13 @@ def calculate_apparent_D_with_noise(meas_erosion,meas_curv,half_length = 7, spac
     max_D = max(root_1_list)
     min_D = min(root_1_list)
     med_D = st.median(root_1_list)
+    D16 = np.percentile(root_1_list,16)
+    D84 = np.percentile(root_1_list,84)
     
     print("Range of D:")
     print([min_D,med_D,max_D])
     
-    return [min_D,med_D,max_D]
+    return [min_D,D16,med_D,D84,max_D]
     
     
     
@@ -382,8 +499,8 @@ def curvature_difference_function_with_noise(D, x, S_c, C_0, rho_ratio,meas_curv
             
     
     
-def ratio_of_fit_to_analytical_hilltop_curvature(displacement_distances, half_length = 7, spacing = 1, S_c = 1.0, C_0 = 0.001 ,D=0.01, rho_ratio=2):
-    """This takes the curvature from the profiles and fits a polynomial to minic
+def ratio_of_fit_to_analytical_hilltop_curvature(displacement_distances, half_length = 6, spacing = 1, S_c = 1.0, C_0 = 0.001 ,D=0.01, rho_ratio=2):
+    """This takes the curvature from the profiles and fits a polynomial to mimic
     what happens inside LSDTopoTools curvature algorithm
 
     Args:
