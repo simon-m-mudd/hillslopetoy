@@ -94,7 +94,7 @@ def set_channel_to_zero(z):
 
 
 
-def ss_linear_elevation(x,C_0 = 0.001 ,D = 0.01 ,rho_ratio =2 ,c =20):
+def ss_linear_elevation(x,C_0 = 0.001 , D = 0.001 , rho_ratio =2 ,c =20):
     """This returns the elevations along a transect for the linear transport model
 
     Args:
@@ -239,6 +239,33 @@ def displace_profile_locations_constant(x, displacement_distance = 0.1):
     """
     x_locs = np.add(x,displacement_distance)
     return x_locs    
+
+def add_noise(z,mean_uncert):
+    """This adds random noise (uniform distribution between -0.5*mean_uncert,0.5*mean_uncert)
+    to the elevations
+
+    Args:
+        z (array): The array of elevations
+        mean_uncert (float): The mean topographic uncertainty
+
+    Returns:
+        The noisy elevation (also replaces the elevation in object)
+
+    Author:
+        Simon M Mudd
+        
+    Date:
+        04/05/2021    
+    """    
+    n_nodes = len(z)
+    noise_vec = np.random.rand(n_nodes)
+    noise_vec = np.subtract(noise_vec,0.5)
+    noise_vec = np.multiply(noise_vec,mean_uncert)
+    #print("The noise vector is: ")
+    #print(noise_vec)
+    noisy_z = np.add(z,noise_vec)
+    z = noisy_z
+    return noisy_z
     
 def fit_hilltop_curvature(x,z):
     """This takes the curvature from the profiles and fits a polynomial to minic
@@ -261,6 +288,31 @@ def fit_hilltop_curvature(x,z):
     p = np.polyfit(x, z, poly_degree)
     curv_meas = 2*p[0]
     return curv_meas
+
+  
+def get_fitted_profile(x,z):
+    """This takes a profile, gets a polynomial fit, and returns the fitted elevations
+
+    Args:
+        x (array): The array of x locations
+        z (array): The array of elevations
+
+    Returns:
+        The fitted slope
+
+    Author:
+        Simon M Mudd
+        
+    Date:
+        04/05/2021    
+    """   
+    poly_degree = 2
+    p = np.polyfit(x, z, poly_degree)
+    new_z = np.multiply(p[0], np.power(x,2) )
+    new_z = np.add( new_z, np.multiply(x,p[1]) ) 
+    new_z = np.add(new_z,p[2])
+
+    return new_z
 
 
 def calculate_apparent_D(meas_erosion,meas_curv,half_length = 6, spacing = 1, S_c = 1.0, rho_ratio=2):
@@ -330,7 +382,7 @@ def calculate_apparent_D(meas_erosion,meas_curv,half_length = 6, spacing = 1, S_
     return [root_1,root_3,root_2]
     
     
-def calculate_apparent_D_with_noise(meas_erosion,meas_curv,half_length = 6, spacing = 1, S_c = 1.0, rho_ratio=2, topographic_uncert = 0.5, n_iterations = 5):
+def calculate_apparent_D_with_noise(meas_erosion,meas_curv,half_length = 6, spacing = 1, S_c = 1.0, rho_ratio=2, topographic_uncert = 0.5, n_iterations = 5, use_brents = False):
     """This functions aim is to see whqat the actualk curvature would be if the profile were displaced
 
     Args:
@@ -342,6 +394,7 @@ def calculate_apparent_D_with_noise(meas_erosion,meas_curv,half_length = 6, spac
         rho_ratio (float): ratio between rock and soil density
         topographic_uncert (float): the mean uncertainty in m of the topographic data
         n_iterations (int): the number of iterations you use to do the random uncertainty. 
+        use_brents (bool): if true, use brent's method instead of toms
 
     Returns:
         The ridgetop curvature in 1/m
@@ -350,7 +403,8 @@ def calculate_apparent_D_with_noise(meas_erosion,meas_curv,half_length = 6, spac
         Simon M Mudd
         
     Date:
-        15/05/2020    
+        15/05/2020   
+        updated 04/05/2021 to include Brents method for unstable samples 
     """  
     
     # first guess the diffusivity from the measured data
@@ -376,34 +430,56 @@ def calculate_apparent_D_with_noise(meas_erosion,meas_curv,half_length = 6, spac
     #    C_offset_vals.append( curvature_difference_function(D, x_loc_baseline, S_c, meas_erosion, rho_ratio,meas_curv) )
     #print("C offsets are: ")
     #print(C_offset_vals)
-        
+ 
+    if(use_brents):
+        print("I am going to use Brent's method to optimise")
+    else:
+        print("I am using the toms748 algorithm to optimise")        
     
     # Run the optimisation
     root_1_list = []
     for i in range(0,n_iterations):
-        #root_1 = optimize.newton(curvature_difference_function_with_noise,D_apparent,args=(x_loc_baseline,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
-        root_1 = optimize.toms748(curvature_difference_function_with_noise,0.000000000001,10,args=(x_loc_baseline,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+        if use_brents:
+            try:
+                root_1 = optimize.brentq(curvature_difference_function_with_noise,0.000000000001,100,args=(x_loc_baseline,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+            except ValueError:
+                print("This iteration did not converge.")
+                n_iterations=n_iterations+1
+
+        else:
+            try:
+                root_1 = optimize.toms748(curvature_difference_function_with_noise,0.000000000001,100,args=(x_loc_baseline,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+
+            except ValueError:
+                print("This iteration did not converge.")
+                n_iterations=n_iterations+1
         root_1_list.append(root_1)
-    
-    
+       
     # now test
     #z = ss_nonlinear_elevation(x_loc_baseline,S_c = S_c,C_0 = meas_erosion , D=root ,rho_ratio = rho_ratio)
-    #app_curv = fit_hilltop_curvature(x_loc_baseline,z)
-    
+    #app_curv = fit_hilltop_curvature(x_loc_baseline,z)  
     #print("Measured curvature is: "+str(meas_curv)+ " and the apparent curvature measured from a gridded sample is: "+str(app_curv))
-    
-    
+       
     # now to get a range, we want the minimum and maximum values
+    # This is the maximum displacement of the data from the divide
     x_displace_max = displace_profile_locations_constant(x_loc_baseline,spacing/2)
-    #x_displace_mean = displace_profile_locations_constant(x_loc_baseline,spacing/4)
     
     root_2_list = []
     root_3_list = []
     for i in range(0,n_iterations):
-        root_2 = optimize.toms748(curvature_difference_function_with_noise,0.000000000001,10,args=(x_displace_max,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
-        #root_3 = optimize.toms748(curvature_difference_function_with_noise,0.00000000001,1,args=(x_displace_mean,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+        if use_brents:
+            try:
+                root_2 = optimize.brentq(curvature_difference_function_with_noise,0.000000000001,100,args=(x_displace_max,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+            except ValueError:
+                print("This iteration did not converge.")
+        else:
+            try:
+                root_2 = optimize.toms748(curvature_difference_function_with_noise,0.000000000001,100,args=(x_displace_max,S_c,meas_erosion,rho_ratio,meas_curv,topographic_uncert))
+            except ValueError:
+                print("This iteration did not converge.")
+
         root_1_list.append(root_2)
-        #root_1_list.append(root_3)
+
     
     max_D = max(root_1_list)
     min_D = min(root_1_list)
@@ -491,9 +567,11 @@ def curvature_difference_function_with_noise(D, x, S_c, C_0, rho_ratio,meas_curv
     
     
     fit_curvature = fit_hilltop_curvature(x,noisy_z)
-    #print("fit_curvature is: "+str(fit_curvature))
-    curvature_offset = meas_curvature-fit_curvature
     
+    curvature_offset = meas_curvature-fit_curvature
+    #print("D: "+str(D)+" fit C: "+str(fit_curvature)+ " meas: "+str(meas_curvature)+" offset: "+str(curvature_offset))
+
+
     return curvature_offset
     
             
