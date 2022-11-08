@@ -123,7 +123,7 @@ def ss_linear_elevation(x,C_0 = 0.001 , D = 0.001 , rho_ratio =2 ,c =20):
     return full_z    
 
 
-def ss_nonlinear_elevation(x,S_c = 1.0,C_0 = 0.001 ,D = 0.01 ,rho_ratio =2 ,c =20):
+def ss_nonlinear_elevation(x,S_c = 1.0,C_0 = 0.001 ,D = 0.001 ,rho_ratio =2 ,c =20):
     """This returns the elevations along a transect using the analytical solutions of the hillslope equations. 
     From Roering et al 2007
 
@@ -153,7 +153,7 @@ def ss_nonlinear_elevation(x,S_c = 1.0,C_0 = 0.001 ,D = 0.01 ,rho_ratio =2 ,c =2
     full_z = first_part*(second_part-third_part)+c
     return full_z    
  
-def ss_nonlinear_hilltop_curvature(C_0 = 0.001, D = 0.01, rho_ratio =2):
+def ss_nonlinear_hilltop_curvature(C_0 = 0.001, D = 0.001, rho_ratio =2):
     """This returns the elevations along a transect using the analytical solutions of the hillslope equations. 
     From Roering et al 2007
 
@@ -383,7 +383,7 @@ def calculate_apparent_D(meas_erosion,meas_curv,half_length = 6, spacing = 1, S_
     
     
 def calculate_apparent_D_with_noise(meas_erosion,meas_curv,half_length = 6, spacing = 1, S_c = 1.0, rho_ratio=2, topographic_uncert = 0.5, n_iterations = 5, use_brents = False):
-    """This functions aim is to see whqat the actualk curvature would be if the profile were displaced
+    """This functions aim is to see what the actual curvature would be if the profile were displaced
 
     Args:
         meas_erosion (float): the measured erosion rate (in m/yr)
